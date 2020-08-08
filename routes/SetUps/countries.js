@@ -1,11 +1,10 @@
 var express = require("express");
-var SMSdetails = express();
+var countries = express();
 var mysql = require("mysql");
 var config = require("../../DB");
 var Joi = require("joi");
 var con = mysql.createPool(config);
-var auth = require("./../SystemAdmin/auth");
-SMSdetails.get("/", auth.validateRole("SMS Details"), function (req, res) {
+countries.get("/", function (req, res) {
   con.getConnection(function (err, connection) {
     if (err) {
       res.json({
@@ -14,7 +13,7 @@ SMSdetails.get("/", auth.validateRole("SMS Details"), function (req, res) {
       });
     } // not connected!
     else {
-      let sp = "call getSMSSenderDetails()";
+      let sp = "call getcountries()";
       connection.query(sp, function (error, results, fields) {
         if (error) {
           res.json({
@@ -30,10 +29,8 @@ SMSdetails.get("/", auth.validateRole("SMS Details"), function (req, res) {
     }
   });
 });
-SMSdetails.get("/:SMTP", auth.validateRole("SMTP Details"), function (
-  req,
-  res
-) {
+countries.get("/:ID", function (req, res) {
+  const ID = req.params.ID;
   con.getConnection(function (err, connection) {
     if (err) {
       res.json({
@@ -42,8 +39,8 @@ SMSdetails.get("/:SMTP", auth.validateRole("SMTP Details"), function (
       });
     } // not connected!
     else {
-      let sp = "call getSMTPDetails()";
-      connection.query(sp, function (error, results, fields) {
+      let sp = "call getOnecountry(?)";
+      connection.query(sp, [ID], function (error, results, fields) {
         if (error) {
           res.json({
             success: false,
@@ -58,22 +55,15 @@ SMSdetails.get("/:SMTP", auth.validateRole("SMTP Details"), function (
     }
   });
 });
-SMSdetails.post("/", auth.validateRole("SMS Details"), function (req, res) {
+countries.post("/", function (req, res) {
   const schema = Joi.object().keys({
-    SenderID: Joi.string().required(),
-    UserName: Joi.string().required(),
-    URL: Joi.string().required(),
-    Key: Joi.string().required(),
+    Description: Joi.string().min(3).required(),
+    Code: Joi.string().min(1).required(),
+    UserName: Joi.string().min(1).required(),
   });
   const result = Joi.validate(req.body, schema);
   if (!result.error) {
-    let data = [
-      req.body.SenderID,
-      req.body.UserName,
-      req.body.URL,
-      req.body.Key,
-      res.locals.user,
-    ];
+    let data = [req.body.Code, req.body.Description, req.body.UserName];
     con.getConnection(function (err, connection) {
       if (err) {
         res.json({
@@ -82,7 +72,7 @@ SMSdetails.post("/", auth.validateRole("SMS Details"), function (req, res) {
         });
       } // not connected!
       else {
-        let sp = "call UpdateSMSDetails(?,?,?,?,?)";
+        let sp = "call Savecountries(?,?,?)";
         connection.query(sp, data, function (error, results, fields) {
           if (error) {
             res.json({
@@ -107,22 +97,17 @@ SMSdetails.post("/", auth.validateRole("SMS Details"), function (req, res) {
     });
   }
 });
-SMSdetails.put("/", auth.validateRole("SMTP Details"), function (req, res) {
+countries.put("/:ID", function (req, res) {
   const schema = Joi.object().keys({
-    Host: Joi.string().required(),
-    Port: Joi.number().required(),
-    Sender: Joi.string().required(),
-    Password: Joi.string().required(),
+    Description: Joi.string().min(3).required(),
+    Code: Joi.string().min(1).required(),
+    UserName: Joi.string().min(1).required(),
   });
   const result = Joi.validate(req.body, schema);
   if (!result.error) {
-    let data = [
-      req.body.Host,
-      req.body.Port,
-      req.body.Sender,
-      req.body.Password,
-      res.locals.user,
-    ];
+    const ID = req.params.ID;
+    let data = [ID, req.body.Description, req.body.UserName];
+
     con.getConnection(function (err, connection) {
       if (err) {
         res.json({
@@ -131,7 +116,7 @@ SMSdetails.put("/", auth.validateRole("SMTP Details"), function (req, res) {
         });
       } // not connected!
       else {
-        let sp = "call Updatesmtpdetails(?,?,?,?,?)";
+        let sp = "call Updatecountry(?,?,?)";
         connection.query(sp, data, function (error, results, fields) {
           if (error) {
             res.json({
@@ -141,7 +126,7 @@ SMSdetails.put("/", auth.validateRole("SMTP Details"), function (req, res) {
           } else {
             res.json({
               success: true,
-              message: "saved",
+              message: "updated",
             });
           }
           connection.release();
@@ -156,4 +141,35 @@ SMSdetails.put("/", auth.validateRole("SMTP Details"), function (req, res) {
     });
   }
 });
-module.exports = SMSdetails;
+countries.delete("/:ID", function (req, res) {
+  const ID = req.params.ID;
+
+  let data = [ID, res.locals.user];
+  con.getConnection(function (err, connection) {
+    if (err) {
+      res.json({
+        success: false,
+        message: err.message,
+      });
+    } // not connected!
+    else {
+      let sp = "call Deletecountry(?,?)";
+      connection.query(sp, data, function (error, results, fields) {
+        if (error) {
+          res.json({
+            success: false,
+            message: error.message,
+          });
+        } else {
+          res.json({
+            success: true,
+            message: "Deleted Successfully",
+          });
+        }
+        connection.release();
+        // Don't use the connection here, it has been returned to the pool.
+      });
+    }
+  });
+});
+module.exports = countries;
